@@ -1,4 +1,4 @@
-flask
+fastapi
 uvicorn
 torch
 numpy
