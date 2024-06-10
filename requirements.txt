@@ -1,8 +1,9 @@
-fastapi
+flask
 uvicorn
 torch
 numpy
 pillow
+pydantic
 facenet-pytorch
 scikit-learn
 gunicorn
