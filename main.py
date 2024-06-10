@@ -92,4 +92,4 @@ def predict_user():
         return jsonify({"error": "No users available for matching"}), 404
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
