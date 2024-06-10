@@ -6,6 +6,7 @@ from facenet_pytorch import InceptionResnetV1, MTCNN
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import io
+import os
 
 app = Flask(__name__)
 
@@ -18,33 +19,52 @@ user_embeddings = {}
 user_ids = []
 
 def save_embeddings(filepath='embeddings.pkl'):
-    with open(filepath, 'wb') as f:
-        pickle.dump({'user_embeddings': user_embeddings, 'user_ids': user_ids}, f)
-    print(f"Embeddings saved to {filepath}")
+    try:
+        with open(filepath, 'wb') as f:
+            pickle.dump({'user_embeddings': user_embeddings, 'user_ids': user_ids}, f)
+        print(f"Embeddings saved to {filepath}")
+    except Exception as e:
+        print(f"Error saving embeddings: {e}")
 
 def load_model(filepath='model.pth'):
     global model
-    model.load_state_dict(torch.load(filepath, map_location=torch.device('cpu')))
-    model.eval()
-    print(f"Model loaded from {filepath}")
+    if os.path.exists(filepath):
+        try:
+            model.load_state_dict(torch.load(filepath, map_location=torch.device('cpu')))
+            model.eval()
+            print(f"Model loaded from {filepath}")
+        except Exception as e:
+            print(f"Error loading model: {e}")
+    else:
+        print(f"Model file {filepath} does not exist.")
 
 def load_embeddings(filepath='embeddings.pkl'):
     global user_embeddings, user_ids
-    with open(filepath, 'rb') as f:
-        data = pickle.load(f)
-        user_embeddings = data['user_embeddings']
-        user_ids = data['user_ids']
-    print(f"Embeddings loaded from {filepath}")
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'rb') as f:
+                data = pickle.load(f)
+                user_embeddings = data['user_embeddings']
+                user_ids = data['user_ids']
+            print(f"Embeddings loaded from {filepath}")
+        except Exception as e:
+            print(f"Error loading embeddings: {e}")
+    else:
+        print(f"Embeddings file {filepath} does not exist.")
 
 def get_face_embedding(image):
-    img = Image.open(io.BytesIO(image))
-    img_cropped = mtcnn(img)
-    
-    if img_cropped is not None:
-        img_embedding = model(img_cropped.unsqueeze(0))
-        return img_embedding.detach().numpy()
-    else:
-        print(f"Face not detected in image.")
+    try:
+        img = Image.open(io.BytesIO(image))
+        img_cropped = mtcnn(img)
+        
+        if img_cropped is not None:
+            img_embedding = model(img_cropped.unsqueeze(0))
+            return img_embedding.detach().numpy()
+        else:
+            print("Face not detected in image.")
+            return None
+    except Exception as e:
+        print(f"Error processing image: {e}")
         return None
 
 @app.route("/add_user/", methods=['POST'])
@@ -82,8 +102,11 @@ def predict_user():
     similarities = []
     for user_id in user_ids:
         stored_embedding = user_embeddings[user_id]
-        sim = cosine_similarity(embedding, stored_embedding)
-        similarities.append((user_id, sim[0][0]))
+        if stored_embedding.shape == embedding.shape:
+            sim = cosine_similarity(embedding, stored_embedding)
+            similarities.append((user_id, sim[0][0]))
+        else:
+            print(f"Shape mismatch: {embedding.shape} vs {stored_embedding.shape}")
     
     if similarities:
         best_match = max(similarities, key=lambda x: x[1])
@@ -92,4 +115,4 @@ def predict_user():
         return jsonify({"error": "No users available for matching"}), 404
 
 if __name__ == '__main__':
-    app.run()
+    app.run(host='0.0.0.0', port=8000)
