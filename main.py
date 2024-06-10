@@ -1,14 +1,13 @@
-from fastapi import FastAPI, UploadFile, File, HTTPException
-from pydantic import BaseModel
+from flask import Flask, request, jsonify
 import torch
 import numpy as np
-from PIL import Image   
+from PIL import Image
 from facenet_pytorch import InceptionResnetV1, MTCNN
 from sklearn.metrics.pairwise import cosine_similarity
 import pickle
 import io
 
-app = FastAPI()
+app = Flask(__name__)
 
 # Initialize MTCNN (face detection)
 mtcnn = MTCNN(image_size=160, margin=0, min_face_size=20)
@@ -48,26 +47,37 @@ def get_face_embedding(image):
         print(f"Face not detected in image.")
         return None
 
-@app.post("/add_user/")
-async def add_user(image: UploadFile = File(...), user_id: str = ''):
-    image_data = await image.read()
+@app.route("/add_user/", methods=['POST'])
+def add_user():
+    if 'image' not in request.files or 'user_id' not in request.form:
+        return jsonify({"error": "Image file and user_id are required"}), 400
+    
+    image_file = request.files['image']
+    user_id = request.form['user_id']
+    image_data = image_file.read()
     embedding = get_face_embedding(image_data)
+    
     if embedding is not None:
         user_embeddings[user_id] = embedding
         user_ids.append(user_id)
         save_embeddings()
-        return {"message": f"User {user_id} added successfully!"}
+        return jsonify({"message": f"User {user_id} added successfully!"})
     else:
-        raise HTTPException(status_code=400, detail="Face not detected in the image.")
+        return jsonify({"error": "Face not detected in the image"}), 400
 
-@app.post("/predict_user/")
-async def predict_user(image: UploadFile = File(...)):
-    image_data = await image.read()
+@app.route("/predict_user/", methods=['POST'])
+def predict_user():
+    if 'image' not in request.files:
+        return jsonify({"error": "Image file is required"}), 400
+    
+    image_file = request.files['image']
+    image_data = image_file.read()
     load_model()
     load_embeddings()
     embedding = get_face_embedding(image_data)
+    
     if embedding is None:
-        raise HTTPException(status_code=400, detail="Face not detected in the image.")
+        return jsonify({"error": "Face not detected in the image"}), 400
     
     similarities = []
     for user_id in user_ids:
@@ -77,6 +87,9 @@ async def predict_user(image: UploadFile = File(...)):
     
     if similarities:
         best_match = max(similarities, key=lambda x: x[1])
-        return {"user_id": best_match[0]}
+        return jsonify({"user_id": best_match[0]})
     else:
-        raise HTTPException(status_code=404, detail="No users available for matching.")
+        return jsonify({"error": "No users available for matching"}), 404
+
+if __name__ == '__main__':
+    app.run(debug=True)
