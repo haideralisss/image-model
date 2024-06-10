@@ -7,3 +7,4 @@ pydantic
 facenet-pytorch
 scikit-learn
 gunicorn
+waitress

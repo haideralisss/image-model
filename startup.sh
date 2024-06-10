@@ -7,4 +7,4 @@ source myenv/bin/activate
 pip install -r requirements.txt
 
 # Run the FastAPI app with uvicorn
-gunicorn --bind=0.0.0.0 main:app
+waitress-serve --host=0.0.0.0 --port=8000 main:app
