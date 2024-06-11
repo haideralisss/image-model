@@ -1,8 +1,6 @@
 flask
 uvicorn
-torch
 numpy
-pillow
 facenet-pytorch
 scikit-learn
 gunicorn
